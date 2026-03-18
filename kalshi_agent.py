@@ -28,8 +28,15 @@ if not GROQ_API_KEY:
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-SYSTEM_PROMPT = "You are an expert prediction market trader on Kalshi. Analyze markets and decide whether to trade YES, NO, or PASS. Prices are in cents (1-99). Only recommend a trade if you have strong conviction above 65% confidence. Respond ONLY with valid JSON and nothing else. Response format: {markets: [{ticker: string, action: YES or NO or PASS, confidence: 0.0-1.0, estimated_probability: 0.0-1.0, reasoning: string, recommended_price_cents: 1-99}]}"
-
+SYSTEM_PROMPT = (
+    "You are an expert prediction market trader on Kalshi. "
+    "Analyze markets and decide whether to trade YES, NO, or PASS. "
+    "Prices are in cents (1-99). Only recommend a trade if you have strong conviction above 65% confidence. "
+    "Respond with STRICT, VALID JSON ONLY. Do not include any explanation, markdown, comments, or code fences. "
+    "Your entire response MUST be a single JSON object exactly matching this schema: "
+    '{"markets":[{"ticker":string,"action":"YES"|"NO"|"PASS","confidence":number,"estimated_probability":number,'
+    '"reasoning":string,"recommended_price_cents":number}]}'
+)
 
 def notify_discord(message: str) -> None:
     """
@@ -74,6 +81,41 @@ def get_kalshi_markets():
         log.error(f"Failed to fetch markets: {e}")
         return []
 
+def _extract_json_block(text: str) -> str:
+    """
+    Try to extract a JSON object or array from a model response.
+    Handles optional markdown code fences and leading/trailing text.
+    Raises ValueError if nothing JSON-like is found.
+    """
+    if not text:
+        raise ValueError("Empty response from model")
+
+    # If there are fenced code blocks, prefer the first fenced section.
+    if "```" in text:
+        parts = text.split("```")
+        # parts[0] is preamble, parts[1] is first fenced block (optionally starting with 'json')
+        if len(parts) > 1:
+            candidate = parts[1].strip()
+            if candidate.lower().startswith("json"):
+                candidate = candidate[4:].lstrip()
+            text = candidate or text
+
+    # Find first '{' or '[' and last '}' or ']' to isolate JSON
+    start_candidates = [i for i in [text.find("{"), text.find("[" )] if i != -1]
+    if not start_candidates:
+        raise ValueError("No JSON object or array start found in response")
+    start = min(start_candidates)
+
+    last_curly = text.rfind("}")
+    last_bracket = text.rfind("]")
+    end_candidates = [i for i in [last_curly, last_bracket] if i != -1]
+    if not end_candidates:
+        raise ValueError("No JSON object or array end found in response")
+    end = max(end_candidates) + 1
+
+    return text[start:end].strip()
+
+
 def analyze_markets(markets):
     if not markets:
         return []
@@ -89,12 +131,19 @@ def analyze_markets(markets):
             temperature=0.3,
             max_tokens=2048,
         )
-        raw = response.choices[0].message.content.strip()
-        if "```" in raw:
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        parsed = json.loads(raw)
+        raw = response.choices[0].message.content or ""
+        raw = raw.strip()
+
+        try:
+            json_text = _extract_json_block(raw)
+            parsed = json.loads(json_text)
+        except Exception as parse_err:
+            # Log and optionally send a trimmed version of the raw response for debugging
+            preview = raw[:500] + ("..." if len(raw) > 500 else "")
+            log.error(f"Failed to parse model JSON: {parse_err}. Raw preview: {preview}")
+            notify_discord(f"Kalshi agent JSON parse error: {parse_err}")
+            return []
+
         return parsed.get("markets", [])
     except Exception as e:
         log.error(f"AI error: {e}")
