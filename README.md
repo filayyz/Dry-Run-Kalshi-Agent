@@ -35,8 +35,13 @@ Create a file named `.env` in the project root with content like:
 
 ```bash
 GROQ_API_KEY=your_groq_api_key_here
+# Optional: override the default Groq model
+# Check https://console.groq.com/ for the latest supported Qwen models
+GROQ_MODEL=qwen-2-72b
 KALSHI_API_KEY_ID=your_kalshi_key_id_here
 KALSHI_PRIVATE_KEY_PATH=./kalshi_private_key.pem
+# Optional: Discord webhook for notifications
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your_webhook_id/your_webhook_token
 ```
 
 > Keep real keys and private key files out of git and any public repo. The provided `.gitignore` is configured to ignore `.env` and `kalshi_private_key.pem`.
@@ -58,12 +63,17 @@ The agent will:
 
 You can adjust the polling interval by changing `interval_seconds` in the `run_agent` call inside `kalshi_agent.py`. By default it is 300 seconds (5 minutes).
 
+If `DISCORD_WEBHOOK_URL` is set in your `.env`, the agent will also:
+- Send a startup message when it begins running.
+- Send a Discord message for each dry-run trade decision that passes the confidence filter.
+
 ### Configuration notes
 
 - `DRY_RUN` is currently **hard-coded to `True`** in `kalshi_agent.py`. Do not change this to `False` until:
   - You have implemented authenticated Kalshi order placement.
   - You have added proper risk controls (position limits, loss limits, etc.).
 - The agent requires a valid `GROQ_API_KEY` in your environment; if it is missing, the script will fail fast rather than attempting to run without access to the model.
+- The Groq model used by the agent is controlled by the `GROQ_MODEL` environment variable; if not set, it defaults to `qwen-2-72b`. You can change this to any currently supported Groq Qwen model.
 
 ### Going beyond dry run (future work)
 
