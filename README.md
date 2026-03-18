@@ -2,7 +2,7 @@
 
 This project runs a **dry-run trading loop** against Kalshi election markets. It:
 - Fetches a subset of open markets from Kalshi.
-- Sends them to a Groq-hosted model (`qwen-qwq-32b`) for analysis.
+- Sends them to a Groq-hosted model (`qwen/qwen3-32b`) for analysis.
 - Logs **recommended trades** (YES/NO/PASS) **without placing real orders**.
 
 Live trading is **not implemented yet**. The `DRY_RUN` flag in `kalshi_agent.py` is set to `True` and should stay that way until you explicitly add and test order placement.
@@ -37,7 +37,7 @@ Create a file named `.env` in the project root with content like:
 GROQ_API_KEY=your_groq_api_key_here
 # Optional: override the default Groq model
 # Check https://console.groq.com/ for the latest supported Qwen models
-GROQ_MODEL=qwen-2-72b
+GROQ_MODEL=qwen/qwen3-32b
 KALSHI_API_KEY_ID=your_kalshi_key_id_here
 KALSHI_PRIVATE_KEY_PATH=./kalshi_private_key.pem
 # Optional: Discord webhook for notifications
@@ -73,7 +73,7 @@ If `DISCORD_WEBHOOK_URL` is set in your `.env`, the agent will also:
   - You have implemented authenticated Kalshi order placement.
   - You have added proper risk controls (position limits, loss limits, etc.).
 - The agent requires a valid `GROQ_API_KEY` in your environment; if it is missing, the script will fail fast rather than attempting to run without access to the model.
-- The Groq model used by the agent is controlled by the `GROQ_MODEL` environment variable; if not set, it defaults to `qwen-2-72b`. You can change this to any currently supported Groq Qwen model.
+- The Groq model used by the agent is controlled by the `GROQ_MODEL` environment variable; if not set, it defaults to `qwen/qwen3-32b`. You can change this to any currently supported Groq Qwen model.
 
 ### Going beyond dry run (future work)
 
